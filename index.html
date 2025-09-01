@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Stream Wall</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app-container" class="sidebar-closed">
+    <aside id="sidebar" class="closed">
+      <h2>     Layouts</h2>
+      <div class="preset-buttons">
+        <button data-count="1">1 Stream</button>
+        <button data-count="4">4 Streams</button>
+        <button data-count="9">9 Streams</button>
+        <button data-count="16">16 Streams</button>
+      </div>
+      <button id="reset">Resetear</button>
+    </aside>
+
+    <main id="grid-container"></main>
+  </div>
+
+  <button id="toggle-sidebar" aria-label="Toggle sidebar">☰</button>
+
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <script src="app.js"></script>
+</body>
+</html>
