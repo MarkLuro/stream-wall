@@ -86,7 +86,7 @@ body {
   width: 100%;
   height: 100%;
   padding: 10px;
-  padding-left: calc(var(--sidebar-width) + 10px);
+  /* El padding-left se maneja abajo con selectores más específicos */
   transition: padding-left 0.3s ease;
   display: grid;
   gap: var(--gap-size);
@@ -95,9 +95,17 @@ body {
   align-content: start;
 }
 
+/* --- CAMBIOS AQUÍ --- */
+/* Reglas más explícitas para el padding del grid */
+#app-container:not(.sidebar-closed) #grid-container {
+  padding-left: calc(var(--sidebar-width) + 10px);
+}
+
 #app-container.sidebar-closed #grid-container {
   padding-left: 10px;
 }
+/* --- FIN DE CAMBIOS --- */
+
 
 /* CELDAS DE STREAM */
 .stream-cell {
@@ -247,4 +255,89 @@ body.is-dragging .stream-cell video {
     grid-template-columns: 1fr !important;
     padding: 10px 5px;
   }
+}
+
+/* CONTROLES DE VOLUMEN */
+.controls-overlay {
+  position: absolute;
+  bottom: 5px;
+  left: 10px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 3;
+  padding: 5px;
+  background: rgba(0, 0, 0, 0.7);
+  border-radius: var(--border-radius);
+  opacity: 0;
+  transition: opacity 0.2s ease-in-out;
+  /* El contenedor es transparente a los clics por defecto */
+  pointer-events: none; 
+}
+
+.stream-cell:hover .controls-overlay {
+  opacity: 1;
+}
+
+.controls-overlay.visible {
+  opacity: 1;
+}
+
+/* Hacemos que el botón de mute sea interactivo */
+.controls-overlay .mute-btn {
+  pointer-events: auto;
+}
+
+/* El slider en sí (su pista) NO es interactivo */
+.controls-overlay .volume-slider {
+  pointer-events: none;
+}
+
+/* PERO el "pulgar" (la bolita) del slider SÍ es interactivo */
+.controls-overlay .volume-slider::-webkit-slider-thumb {
+  pointer-events: auto;
+}
+
+.controls-overlay .volume-slider::-moz-range-thumb {
+  pointer-events: auto;
+}
+
+
+.mute-btn {
+  background: none;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  font-size: 1.2rem;
+  padding: 0 5px;
+}
+
+.volume-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 8px;
+  background: #555;
+  outline: none;
+  border-radius: 4px;
+  transition: opacity 0.2s;
+}
+
+.volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  background: var(--accent);
+  cursor: pointer;
+  border-radius: 50%;
+}
+
+.volume-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: var(--accent);
+  cursor: pointer;
+  border-radius: 50%;
 }
