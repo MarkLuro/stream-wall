@@ -4,8 +4,19 @@ const presetButtons = document.querySelectorAll('.preset-buttons button');
 const resetButton = document.getElementById('reset');
 const toggleSidebar = document.getElementById('toggle-sidebar');
 const sidebar = document.getElementById('sidebar');
+// ---> NUEVO: Referencia al botón de mute global <---
+const muteAllBtn = document.getElementById('mute-all');
 
 let sortableInstance = null;
+
+// ---> NUEVO: Función de utilidad Debounce <---
+function debounce(func, delay) {
+  let timeout;
+  return function(...args) {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func.apply(this, args), delay);
+  };
+}
 
 function loadYouTubeAPI() {
   return new Promise((resolve) => {
@@ -22,10 +33,38 @@ function loadYouTubeAPI() {
 }
 
 let youtubeApiReady = loadYouTubeAPI();
+// ---> NUEVO: Versión debounced de la función de guardado <---
+const debouncedSave = debounce(saveCurrentState, 500);
 
 toggleSidebar.addEventListener('click', () => {
   sidebar.classList.toggle('closed');
   appContainer.classList.toggle('sidebar-closed');
+});
+
+// ---> NUEVO: Event listener para el botón de Mute All <---
+muteAllBtn.addEventListener('click', () => {
+  const cells = document.querySelectorAll('.stream-cell');
+  // Determina si la acción será mutear o desmutear
+  // Si al menos uno está con sonido, la acción será mutear a todos.
+  const shouldMute = Array.from(cells).some(cell => cell.playerInstance && !cell.playerInstance.isMuted());
+
+  muteAllBtn.textContent = shouldMute ? 'Quitar Silencio' : 'Silenciar Todos';
+
+  cells.forEach(cell => {
+    if (cell.playerInstance) {
+      cell.playerInstance.setMuted(shouldMute);
+      // Actualizar la UI de cada celda
+      const muteBtn = cell.querySelector('.mute-btn');
+      const slider = cell.querySelector('.volume-slider');
+      muteBtn.innerHTML = shouldMute ? '🔇' : '🔊';
+      if (shouldMute) {
+        slider.value = 0;
+      } else if(cell.playerInstance.getVolume) {
+        slider.value = cell.playerInstance.getVolume();
+      }
+    }
+  });
+  saveCurrentState(); // Guarda el nuevo estado de todos
 });
 
 window.addEventListener('load', () => {
@@ -75,14 +114,14 @@ function generateGrid(count, savedItems = []) {
 
     const contentWrapper = document.createElement('div');
     contentWrapper.className = 'cell-content-wrapper';
-    
+
     const streamContainer = document.createElement('div');
     streamContainer.className = 'stream-content';
     streamContainer.id = `player-container-${i}`;
 
     const inputOverlay = document.createElement('div');
     inputOverlay.className = 'input-overlay';
-    
+
     const input = document.createElement('input');
     input.placeholder = 'URL del stream...';
     input.value = itemData.url;
@@ -103,11 +142,12 @@ function generateGrid(count, savedItems = []) {
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') loadAndSave();
     });
-    input.addEventListener('input', saveCurrentState);
+    // ---> CAMBIO: Usamos la versión debounced para el guardado en input <---
+    input.addEventListener('input', debouncedSave);
 
     inputOverlay.appendChild(input);
     inputOverlay.appendChild(loadBtn);
-    
+
     const controlsOverlay = document.createElement('div');
     controlsOverlay.className = 'controls-overlay';
 
@@ -120,13 +160,13 @@ function generateGrid(count, savedItems = []) {
           const isMuted = player.isMuted();
           player.setMuted(!isMuted);
           muteBtn.innerHTML = !isMuted ? '🔇' : '🔊';
-          if (!isMuted === false) {
+          if (!isMuted === false && player.getVolume) {
             volumeSlider.value = player.getVolume();
           }
       }
       saveCurrentState();
     };
-    
+
     const volumeSlider = document.createElement('input');
     volumeSlider.type = 'range';
     volumeSlider.className = 'volume-slider';
@@ -134,7 +174,7 @@ function generateGrid(count, savedItems = []) {
     volumeSlider.max = 1;
     volumeSlider.step = 0.05;
     volumeSlider.value = itemData.muted ? 0 : itemData.volume;
-    
+
     volumeSlider.addEventListener('input', () => {
       const player = cell.playerInstance;
       if (player) {
@@ -144,7 +184,8 @@ function generateGrid(count, savedItems = []) {
               muteBtn.innerHTML = '🔊';
           }
       }
-      saveCurrentState();
+      // ---> CAMBIO: Usamos la versión debounced para el guardado en slider <---
+      debouncedSave();
     });
 
     controlsOverlay.appendChild(muteBtn);
@@ -168,7 +209,7 @@ function generateGrid(count, savedItems = []) {
   if (sortableInstance) {
     sortableInstance.destroy();
   }
-  
+
   sortableInstance = new Sortable(gridContainer, {
     animation: 150,
     ghostClass: 'sortable-ghost',
@@ -203,10 +244,16 @@ function saveCurrentState() {
 async function loadStream(url, cell) {
   const container = cell.querySelector('.stream-content');
   const controls = cell.querySelector('.controls-overlay');
-  container.innerHTML = '';
-  controls.style.display = 'none';
   
-  if (!url) return;
+  // ---> CAMBIO: Añadimos el indicador de carga <---
+  container.innerHTML = '<div class="loader"></div>';
+  
+  controls.style.display = 'none';
+
+  if (!url) {
+    container.innerHTML = ''; // Limpiamos el loader si no hay URL
+    return;
+  }
 
   if (cell.playerInstance && typeof cell.playerInstance.destroy === 'function') {
       cell.playerInstance.destroy();
@@ -215,7 +262,7 @@ async function loadStream(url, cell) {
 
   const playerContainerId = container.id;
   const itemData = getCurrentItemsState()[Array.from(gridContainer.children).indexOf(cell)];
-  
+
   if (url.includes('youtube.com') || url.includes('youtu.be')) {
     const id = extractYouTubeID(url);
     if (id) {
@@ -250,9 +297,7 @@ async function loadStream(url, cell) {
         parent: [parentDomain],
         autoplay: true,
         muted: true,
-        // ========= CAMBIO AQUÍ =========
-        layout: "video" // Le decimos a Twitch que solo muestre el video.
-        // ===============================
+        layout: "video"
       });
       embed.addEventListener(Twitch.Embed.READY, () => {
         const player = embed.getPlayer();
@@ -275,6 +320,7 @@ async function loadStream(url, cell) {
     video.playsinline = true;
     video.style.width = '100%';
     video.style.height = '100%';
+    container.innerHTML = ''; // Limpiamos el loader antes de añadir el video
     container.appendChild(video);
     if (Hls.isSupported()) {
       const hls = new Hls();
@@ -298,6 +344,7 @@ async function loadStream(url, cell) {
     iframe.style.width = '100%';
     iframe.style.height = '100%';
     iframe.frameBorder = '0';
+    container.innerHTML = ''; // Limpiamos el loader
     container.appendChild(iframe);
   }
 }
@@ -306,14 +353,19 @@ function onPlayerReady(event, cell, itemData, controls) {
     const player = cell.playerInstance;
     if (!player) return;
 
-    player.setVolume(itemData.volume);
-    player.setMuted(itemData.muted);
-    
+    // A veces onPlayerReady puede tardar, así que aplicamos el estado de nuevo
+    if (player.setVolume) player.setVolume(itemData.volume);
+    if (player.setMuted) player.setMuted(itemData.muted);
+
     const muteBtn = cell.querySelector('.mute-btn');
     const slider = cell.querySelector('.volume-slider');
-    muteBtn.innerHTML = player.isMuted() ? '🔇' : '🔊';
-    slider.value = player.isMuted() ? 0 : player.getVolume();
     
+    if (player.isMuted) {
+      const isMuted = player.isMuted();
+      muteBtn.innerHTML = isMuted ? '🔇' : '🔊';
+      slider.value = isMuted ? 0 : (player.getVolume ? player.getVolume() : itemData.volume);
+    }
+
     controls.style.display = 'flex';
 }
 
