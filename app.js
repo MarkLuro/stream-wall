@@ -224,9 +224,7 @@ async function loadStream(url, cell) {
         height: '100%',
         width: '100%',
         videoId: id,
-        // ========= CAMBIO AQUÍ =========
         playerVars: { 'autoplay': 1, 'mute': 1, 'playsinline': 1, 'controls': 1 },
-        // ===============================
         events: {
           'onReady': (event) => onPlayerReady(event, cell, itemData, controls)
         }
@@ -251,7 +249,10 @@ async function loadStream(url, cell) {
         channel: channel,
         parent: [parentDomain],
         autoplay: true,
-        muted: true
+        muted: true,
+        // ========= CAMBIO AQUÍ =========
+        layout: "video" // Le decimos a Twitch que solo muestre el video.
+        // ===============================
       });
       embed.addEventListener(Twitch.Embed.READY, () => {
         const player = embed.getPlayer();
