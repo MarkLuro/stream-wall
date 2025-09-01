@@ -5,6 +5,9 @@ const resetButton = document.getElementById('reset');
 const toggleSidebar = document.getElementById('toggle-sidebar');
 const sidebar = document.getElementById('sidebar');
 
+// Variable para guardar la instancia de Sortable
+let sortableInstance = null;
+
 // Mostrar/Ocular sidebar
 toggleSidebar.addEventListener('click', () => {
   sidebar.classList.toggle('closed');
@@ -50,14 +53,18 @@ function generateGrid(count, savedUrls = []) {
     const cell = document.createElement('div');
     cell.className = 'stream-cell';
 
+    const dragHandle = document.createElement('div');
+    dragHandle.className = 'drag-handle';
+    dragHandle.innerHTML = '&#x2630;'; // Icono de menú (hamburguesa)
+    dragHandle.title = 'Arrastrar para reordenar';
+    cell.appendChild(dragHandle);
+
     const contentWrapper = document.createElement('div');
     contentWrapper.className = 'cell-content-wrapper';
 
-    // Capa de video
     const streamContainer = document.createElement('div');
     streamContainer.className = 'stream-content';
 
-    // Capa de entrada
     const inputOverlay = document.createElement('div');
     inputOverlay.className = 'input-overlay';
 
@@ -68,7 +75,6 @@ function generateGrid(count, savedUrls = []) {
     const loadBtn = document.createElement('button');
     loadBtn.textContent = '▶';
 
-    // Función para cargar stream y guardar estado
     const loadAndSave = () => {
       if (!input.value.trim()) {
         streamContainer.innerHTML = '<p class="error-msg">Introduce una URL válida</p>';
@@ -79,35 +85,43 @@ function generateGrid(count, savedUrls = []) {
     };
 
     loadBtn.onclick = loadAndSave;
-
-    // Cargar con Enter en el input
     input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        loadAndSave();
-      }
+      if (e.key === 'Enter') loadAndSave();
     });
-
-    // Auto guardar estado al cambiar el input
-    input.addEventListener('input', () => {
-      saveCurrentState();
-    });
+    input.addEventListener('input', saveCurrentState);
 
     inputOverlay.appendChild(input);
     inputOverlay.appendChild(loadBtn);
-
     contentWrapper.appendChild(streamContainer);
     contentWrapper.appendChild(inputOverlay);
-
     cell.appendChild(contentWrapper);
     gridContainer.appendChild(cell);
 
-    // Si ya tiene URL, cargar stream automáticamente
     if (savedUrls[i]) {
       loadStream(savedUrls[i], streamContainer);
     }
   }
 
   saveCurrentState();
+
+  // Si ya existe una instancia de Sortable, la destruimos antes de crear una nueva
+  if (sortableInstance) {
+    sortableInstance.destroy();
+  }
+
+  // Creamos la nueva instancia y la guardamos en la variable
+  sortableInstance = new Sortable(gridContainer, {
+    animation: 150,
+    ghostClass: 'sortable-ghost',
+    handle: '.drag-handle', // Especificamos el mango de arrastre
+    onStart: function () {
+      document.body.classList.add('is-dragging');
+    },
+    onEnd: function () {
+      document.body.classList.remove('is-dragging');
+      saveCurrentState();
+    }
+  });
 }
 
 function saveCurrentState() {
@@ -123,11 +137,7 @@ function saveState(count, urls) {
 
 function loadStream(url, container) {
   container.innerHTML = '';
-
-  if (!url) {
-    container.innerHTML = '<p class="error-msg">URL vacía</p>';
-    return;
-  }
+  if (!url) return;
 
   if (url.includes('youtube.com') || url.includes('youtu.be')) {
     const id = extractYouTubeID(url);
@@ -137,21 +147,15 @@ function loadStream(url, container) {
     } else {
       container.innerHTML = '<p class="error-msg">URL de YouTube inválida</p>';
     }
-
   } else if (url.includes('twitch.tv')) {
     const channel = extractTwitchChannel(url);
     if (channel) {
-      // --- INICIO DE LA MODIFICACIÓN "A PRUEBA DE BALAS" ---
-      // Si location.hostname está vacío (p.ej. al abrir como un archivo file://),
-      // usamos 'localhost' como valor por defecto para prevenir el error '[InvalidParent]'.
       const parentDomain = location.hostname || 'localhost';
       const iframe = createStreamIframe(`https://player.twitch.tv/?channel=${channel}&parent=${parentDomain}&autoplay=true&muted=true`);
-      // --- FIN DE LA MODIFICACIÓN "A PRUEBA DE BALAS" ---
       container.appendChild(iframe);
     } else {
       container.innerHTML = '<p class="error-msg">URL de Twitch inválida</p>';
     }
-
   } else if (url.endsWith('.m3u8')) {
     const video = document.createElement('video');
     video.controls = true;
@@ -160,9 +164,7 @@ function loadStream(url, container) {
     video.setAttribute("playsinline", "");
     container.appendChild(video);
     loadHLS(url, video);
-
   } else {
-    // Para URLs genéricas, intenta insertar como iframe directamente
     const iframe = createStreamIframe(url);
     container.appendChild(iframe);
   }

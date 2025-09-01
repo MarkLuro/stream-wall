@@ -28,7 +28,7 @@ body {
   width: 100%;
   height: 100%;
   position: relative;
-  overflow: hidden; /* Evita scrollbars extraños durante la animación */
+  overflow: hidden;
 }
 
 /* SIDEBAR */
@@ -99,27 +99,21 @@ body {
   padding-left: 10px;
 }
 
-/* --- CAMBIOS EN LAS CELDAS --- */
-
-/* 1. La celda principal AHORA SOLO tiene el borde y el fondo */
+/* CELDAS DE STREAM */
 .stream-cell {
-  position: relative;
+  position: relative; /* Contexto para el drag-handle y el overlay */
   background: #222;
   border: var(--cell-border);
   border-radius: var(--border-radius);
-  /* Se eliminaron aspect-ratio y overflow de aquí */
 }
 
-/* 2. El NUEVO wrapper tiene el aspect-ratio y corta el contenido */
 .cell-content-wrapper {
   position: relative;
   aspect-ratio: 16 / 9;
   overflow: hidden;
-  /* El radio debe ser un poco más pequeño que el de la celda para que encaje bien */
-  border-radius: calc(var(--border-radius) - 2px); 
+  border-radius: calc(var(--border-radius) - 2px);
 }
 
-/* 3. El resto de selectores funcionan igual porque están dentro del wrapper */
 .stream-content {
   width: 100%;
   height: 100%;
@@ -149,8 +143,6 @@ iframe, video {
   border-radius: var(--border-radius);
   user-select: none;
 }
-
-/* --- FIN DE CAMBIOS EN CELDAS --- */
 
 .stream-cell:hover .input-overlay {
   opacity: 1;
@@ -200,6 +192,46 @@ iframe, video {
   color: #000;
 }
 
+/* DRAG & DROP */
+body.is-dragging .stream-cell iframe,
+body.is-dragging .stream-cell video {
+  pointer-events: none;
+}
+
+.sortable-ghost {
+  opacity: 0.4;
+  background: #444;
+}
+
+.drag-handle {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 28px;
+  height: 28px;
+  background-color: rgba(0, 0, 0, 0.6);
+  border-radius: 4px;
+  z-index: 10;
+  cursor: grab;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  color: #fff;
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+.stream-cell:hover .drag-handle {
+  opacity: 1;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+/* RESPONSIVE */
 @media (max-width: 768px) {
   #sidebar {
     width: 100%;
