@@ -244,10 +244,10 @@ function saveCurrentState() {
 async function loadStream(url, cell) {
   const container = cell.querySelector('.stream-content');
   const controls = cell.querySelector('.controls-overlay');
-  
+
   // ---> CAMBIO: Añadimos el indicador de carga <---
   container.innerHTML = '<div class="loader"></div>';
-  
+
   controls.style.display = 'none';
 
   if (!url) {
@@ -300,6 +300,12 @@ async function loadStream(url, cell) {
         layout: "video"
       });
       embed.addEventListener(Twitch.Embed.READY, () => {
+        // ---> ¡AQUÍ ESTÁ LA CORRECCIÓN! <---
+        // Elimina explícitamente el loader para Twitch
+        const loader = container.querySelector('.loader');
+        if (loader) loader.remove();
+        // --------------------------------------------------------------------
+
         const player = embed.getPlayer();
         cell.playerInstance = {
           setVolume: (vol) => player.setVolume(vol),
