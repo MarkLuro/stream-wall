@@ -86,7 +86,6 @@ body {
   width: 100%;
   height: 100%;
   padding: 10px;
-  /* El padding-left se maneja abajo con selectores más específicos */
   transition: padding-left 0.3s ease;
   display: grid;
   gap: var(--gap-size);
@@ -95,8 +94,6 @@ body {
   align-content: start;
 }
 
-/* --- CAMBIOS AQUÍ --- */
-/* Reglas más explícitas para el padding del grid */
 #app-container:not(.sidebar-closed) #grid-container {
   padding-left: calc(var(--sidebar-width) + 10px);
 }
@@ -104,12 +101,33 @@ body {
 #app-container.sidebar-closed #grid-container {
   padding-left: 10px;
 }
-/* --- FIN DE CAMBIOS --- */
+
+/* --- CAMBIO: Estilos para Layouts Asimétricos corregidos --- */
+#grid-container.layout--1-plus-3 {
+  grid-template-columns: 3fr 1fr;
+  grid-template-areas:
+    "main side1"
+    "main side2"
+    "main side3";
+  /* Esta línea hace que las filas se estiren para llenar el espacio vertical */
+  align-content: stretch;
+}
+
+#grid-container.layout--1-plus-3 .stream-cell:nth-child(1) { grid-area: main; }
+#grid-container.layout--1-plus-3 .stream-cell:nth-child(2) { grid-area: side1; }
+#grid-container.layout--1-plus-3 .stream-cell:nth-child(3) { grid-area: side2; }
+#grid-container.layout--1-plus-3 .stream-cell:nth-child(4) { grid-area: side3; }
+
+#grid-container.layout--1-plus-3 .stream-cell:nth-child(1) .cell-content-wrapper {
+  aspect-ratio: auto;
+  height: 100%;
+}
+/* --- FIN DE CAMBIOS DE LAYOUT --- */
 
 
 /* CELDAS DE STREAM */
 .stream-cell {
-  position: relative; /* Contexto para el drag-handle y el overlay */
+  position: relative;
   background: #222;
   border: var(--cell-border);
   border-radius: var(--border-radius);
@@ -185,7 +203,7 @@ iframe, video {
   outline-offset: 2px;
 }
 
-/* ---> CAMBIO: Se añade #mute-all al selector para que comparta estilo <--- */
+/* BOTONES DEL SIDEBAR */
 .preset-buttons button, #reset, #mute-all {
   width: 100%;
   padding: 10px;
@@ -199,10 +217,81 @@ iframe, video {
   transition: background-color 0.2s ease;
 }
 
-/* ---> CAMBIO: Se añade #mute-all al selector para el hover <--- */
 .preset-buttons button:hover, #reset:hover, #mute-all:hover {
   background-color: var(--accent);
   color: #000;
+}
+
+/* Estilos para la sección de "Mis Walls" */
+.user-walls {
+  margin-top: 1.5rem;
+  border-top: 1px solid #444;
+  padding-top: 1rem;
+}
+
+.save-wall-form {
+  display: flex;
+  gap: 5px;
+  margin-bottom: 1rem;
+}
+
+#wall-name-input {
+  flex-grow: 1;
+  background: #222;
+  border: 1px solid #555;
+  color: var(--fg-color);
+  padding: 8px;
+  border-radius: 4px;
+  min-width: 0;
+}
+
+#save-wall-btn {
+  padding: 8px 12px;
+  background-color: var(--accent);
+  color: #000;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+#saved-walls-list-container {
+  max-height: 200px;
+  overflow-y: auto;
+  background: #2a2a2a;
+  border-radius: 4px;
+  padding: 5px;
+}
+
+#saved-walls-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.saved-wall-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px;
+  cursor: pointer;
+  border-radius: 3px;
+}
+
+.saved-wall-item:hover {
+  background-color: #3f3f3f;
+}
+
+.delete-wall-btn {
+  background: none;
+  border: none;
+  color: #aaa;
+  cursor: pointer;
+  font-size: 1.2rem;
+  padding: 0 5px;
+}
+
+.delete-wall-btn:hover {
+  color: #ff5555;
 }
 
 /* DRAG & DROP */
@@ -277,7 +366,6 @@ body.is-dragging .stream-cell video {
   border-radius: var(--border-radius);
   opacity: 0;
   transition: opacity 0.2s ease-in-out;
-  /* El contenedor es transparente a los clics por defecto */
   pointer-events: none;
 }
 
@@ -289,17 +377,14 @@ body.is-dragging .stream-cell video {
   opacity: 1;
 }
 
-/* Hacemos que el botón de mute sea interactivo */
 .controls-overlay .mute-btn {
   pointer-events: auto;
 }
 
-/* El slider en sí (su pista) NO es interactivo */
 .controls-overlay .volume-slider {
   pointer-events: none;
 }
 
-/* PERO el "pulgar" (la bolita) del slider SÍ es interactivo */
 .controls-overlay .volume-slider::-webkit-slider-thumb {
   pointer-events: auto;
 }
@@ -347,7 +432,7 @@ body.is-dragging .stream-cell video {
   border-radius: 50%;
 }
 
-/* ---> NUEVO: Estilos para el indicador de carga <--- */
+/* INDICADOR DE CARGA */
 .loader {
   border: 4px solid #f3f3f3;
   border-top: 4px solid var(--accent);
@@ -355,7 +440,6 @@ body.is-dragging .stream-cell video {
   width: 40px;
   height: 40px;
   animation: spin 1s linear infinite;
-  /* No necesita position absolute porque el contenedor .stream-content ya es un flexbox centrado */
 }
 
 @keyframes spin {

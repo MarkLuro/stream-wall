@@ -12,11 +12,25 @@
     <aside id="sidebar" class="closed">
       <h2>Layouts</h2>
       <div class="preset-buttons">
-        <button data-count="1">1 Stream</button>
-        <button data-count="4">4 Streams</button>
-        <button data-count="9">9 Streams</button>
-        <button data-count="16">16 Streams</button>
-      </div> 
+        <button data-layout="grid-1">1 Stream</button>
+        <button data-layout="grid-4">4 Streams</button>
+        <button data-layout="grid-9">9 Streams</button>
+        <button data-layout="grid-16">16 Streams</button>
+        <button data-layout="1-plus-3">1 Principal + 3</button>
+      </div>
+      
+      <div class="user-walls">
+        <h2>Mis Walls</h2>
+        <div class="save-wall-form">
+          <input type="text" id="wall-name-input" placeholder="Nombre del Wall...">
+          <button id="save-wall-btn">Guardar</button>
+        </div>
+        <div id="saved-walls-list-container">
+          <ul id="saved-walls-list">
+          </ul>
+        </div>
+      </div>
+
       <div class="global-controls">
         <button id="mute-all">Silenciar Todos</button>
       </div>

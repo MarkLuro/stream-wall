@@ -4,12 +4,23 @@ const presetButtons = document.querySelectorAll('.preset-buttons button');
 const resetButton = document.getElementById('reset');
 const toggleSidebar = document.getElementById('toggle-sidebar');
 const sidebar = document.getElementById('sidebar');
-// ---> NUEVO: Referencia al botón de mute global <---
 const muteAllBtn = document.getElementById('mute-all');
+// ---> NUEVO: Referencias a los nuevos elementos de la UI <---
+const wallNameInput = document.getElementById('wall-name-input');
+const saveWallBtn = document.getElementById('save-wall-btn');
+const savedWallsList = document.getElementById('saved-walls-list');
 
 let sortableInstance = null;
 
-// ---> NUEVO: Función de utilidad Debounce <---
+// ---> NUEVO: Objeto de configuración de Layouts <---
+const LAYOUTS = {
+  'grid-1': { count: 1, name: '1 Stream' },
+  'grid-4': { count: 4, name: '4 Streams' },
+  'grid-9': { count: 9, name: '9 Streams' },
+  'grid-16': { count: 16, name: '16 Streams' },
+  '1-plus-3': { count: 4, name: '1 Principal + 3' }
+};
+
 function debounce(func, delay) {
   let timeout;
   return function(...args) {
@@ -33,7 +44,6 @@ function loadYouTubeAPI() {
 }
 
 let youtubeApiReady = loadYouTubeAPI();
-// ---> NUEVO: Versión debounced de la función de guardado <---
 const debouncedSave = debounce(saveCurrentState, 500);
 
 toggleSidebar.addEventListener('click', () => {
@@ -41,11 +51,8 @@ toggleSidebar.addEventListener('click', () => {
   appContainer.classList.toggle('sidebar-closed');
 });
 
-// ---> NUEVO: Event listener para el botón de Mute All <---
 muteAllBtn.addEventListener('click', () => {
   const cells = document.querySelectorAll('.stream-cell');
-  // Determina si la acción será mutear o desmutear
-  // Si al menos uno está con sonido, la acción será mutear a todos.
   const shouldMute = Array.from(cells).some(cell => cell.playerInstance && !cell.playerInstance.isMuted());
 
   muteAllBtn.textContent = shouldMute ? 'Quitar Silencio' : 'Silenciar Todos';
@@ -53,7 +60,6 @@ muteAllBtn.addEventListener('click', () => {
   cells.forEach(cell => {
     if (cell.playerInstance) {
       cell.playerInstance.setMuted(shouldMute);
-      // Actualizar la UI de cada celda
       const muteBtn = cell.querySelector('.mute-btn');
       const slider = cell.querySelector('.volume-slider');
       muteBtn.innerHTML = shouldMute ? '🔇' : '🔊';
@@ -64,41 +70,118 @@ muteAllBtn.addEventListener('click', () => {
       }
     }
   });
-  saveCurrentState(); // Guarda el nuevo estado de todos
+  saveCurrentState();
 });
 
 window.addEventListener('load', () => {
-  try {
-    const saved = JSON.parse(localStorage.getItem('stream-wall'));
-    if (saved && saved.count && saved.items) {
-      generateGrid(saved.count, saved.items);
-    } else {
-      generateGrid(4);
-    }
-  } catch (e) {
-    console.error('Error cargando estado guardado:', e);
-    generateGrid(4);
+  // ---> CAMBIO: Lógica de carga completamente nueva <---
+  populateWallList();
+  const lastActiveWallName = localStorage.getItem('stream-wall-last-active');
+  const allWalls = getSavedWalls();
+
+  if (lastActiveWallName && allWalls[lastActiveWallName]) {
+    const wallData = allWalls[lastActiveWallName];
+    generateGrid(wallData.layout, wallData.items);
+  } else if (Object.keys(allWalls).length > 0) {
+    // Si no hay último activo, carga el primero que encuentre
+    const firstWallName = Object.keys(allWalls)[0];
+    const wallData = allWalls[firstWallName];
+    generateGrid(wallData.layout, wallData.items);
+  } else {
+    // Si no hay nada guardado, carga un layout por defecto
+    generateGrid('grid-4');
   }
 });
 
 presetButtons.forEach(btn => {
   btn.addEventListener('click', () => {
-    const count = parseInt(btn.dataset.count);
+    // ---> CAMBIO: Usa data-layout en lugar de data-count <---
+    const layout = btn.dataset.layout;
     const currentItems = getCurrentItemsState();
-    generateGrid(count, currentItems);
+    generateGrid(layout, currentItems);
   });
 });
 
 resetButton.onclick = () => {
-  localStorage.removeItem('stream-wall');
+  // ---> CAMBIO: Limpia los nuevos items de localStorage <---
+  localStorage.removeItem('stream-wall-presets');
+  localStorage.removeItem('stream-wall-last-active');
   location.reload();
 };
 
-function generateGrid(count, savedItems = []) {
-  gridContainer.innerHTML = '';
-  const cols = Math.ceil(Math.sqrt(count));
-  gridContainer.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+// ---> NUEVO: Event listeners para guardar, cargar y borrar walls <---
+saveWallBtn.addEventListener('click', () => {
+  const wallName = wallNameInput.value.trim();
+  if (!wallName) {
+    alert('Por favor, introduce un nombre para el wall.');
+    return;
+  }
 
+  const allWalls = getSavedWalls();
+  const currentState = {
+    layout: getCurrentLayout(),
+    items: getCurrentItemsState()
+  };
+  
+  allWalls[wallName] = currentState;
+  localStorage.setItem('stream-wall-presets', JSON.stringify(allWalls));
+  localStorage.setItem('stream-wall-last-active', wallName); // El que guardas es ahora el activo
+
+  wallNameInput.value = '';
+  populateWallList(); // Actualiza la lista en la UI
+});
+
+// Usamos delegación de eventos para los botones de la lista
+savedWallsList.addEventListener('click', (e) => {
+    const target = e.target;
+    const wallItem = target.closest('.saved-wall-item');
+    if (!wallItem) return;
+
+    const wallName = wallItem.dataset.name;
+    const allWalls = getSavedWalls();
+
+    if (target.classList.contains('delete-wall-btn')) {
+        // --- BORRAR WALL ---
+        if (confirm(`¿Seguro que quieres borrar el wall "${wallName}"?`)) {
+            delete allWalls[wallName];
+            localStorage.setItem('stream-wall-presets', JSON.stringify(allWalls));
+            
+            if (localStorage.getItem('stream-wall-last-active') === wallName) {
+                localStorage.removeItem('stream-wall-last-active');
+            }
+            populateWallList();
+        }
+    } else {
+        // --- CARGAR WALL ---
+        if (allWalls[wallName]) {
+            const wallData = allWalls[wallName];
+            generateGrid(wallData.layout, wallData.items);
+            localStorage.setItem('stream-wall-last-active', wallName);
+        }
+    }
+});
+
+function generateGrid(layout = 'grid-4', savedItems = []) {
+  gridContainer.innerHTML = '';
+
+  const layoutConfig = LAYOUTS[layout];
+  if (!layoutConfig) {
+      console.error(`Layout desconocido: ${layout}`);
+      return;
+  }
+  const count = layoutConfig.count;
+
+  // ---> CAMBIO: Control de layout por clases CSS en lugar de JS inline style <---
+  gridContainer.className = ''; // Limpia clases de layout anteriores
+  gridContainer.classList.add(`layout--${layout}`);
+  
+  if (layout.startsWith('grid-')) {
+    const cols = Math.ceil(Math.sqrt(count));
+    gridContainer.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+  } else {
+    gridContainer.style.gridTemplateColumns = ''; // Dejamos que el CSS lo maneje
+  }
+  
   for (let i = 0; i < count; i++) {
     const itemData = savedItems[i] || { url: '', volume: 0.5, muted: true };
 
@@ -142,7 +225,6 @@ function generateGrid(count, savedItems = []) {
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') loadAndSave();
     });
-    // ---> CAMBIO: Usamos la versión debounced para el guardado en input <---
     input.addEventListener('input', debouncedSave);
 
     inputOverlay.appendChild(input);
@@ -184,7 +266,6 @@ function generateGrid(count, savedItems = []) {
               muteBtn.innerHTML = '🔊';
           }
       }
-      // ---> CAMBIO: Usamos la versión debounced para el guardado en slider <---
       debouncedSave();
     });
 
@@ -235,23 +316,74 @@ function getCurrentItemsState() {
   });
 }
 
+// ---> NUEVO: Helper para obtener el layout actual <---
+function getCurrentLayout() {
+    for (const className of gridContainer.classList) {
+        if (className.startsWith('layout--')) {
+            return className.replace('layout--', '');
+        }
+    }
+    return 'grid-4'; // Fallback
+}
+
+// ---> CAMBIO: La función de guardado ahora actualiza el "wall activo" <---
 function saveCurrentState() {
+  const layout = getCurrentLayout();
   const items = getCurrentItemsState();
-  const count = items.length;
-  localStorage.setItem('stream-wall', JSON.stringify({ count, items }));
+  const lastActiveWallName = localStorage.getItem('stream-wall-last-active');
+  
+  if (lastActiveWallName) {
+      const allWalls = getSavedWalls();
+      if (allWalls[lastActiveWallName]) {
+          allWalls[lastActiveWallName] = { layout, items };
+          localStorage.setItem('stream-wall-presets', JSON.stringify(allWalls));
+      }
+  }
+}
+
+// ---> NUEVO: Funciones para manejar los presets guardados <---
+function getSavedWalls() {
+    try {
+        const walls = localStorage.getItem('stream-wall-presets');
+        return walls ? JSON.parse(walls) : {};
+    } catch (e) {
+        console.error("Error al leer los walls guardados:", e);
+        return {};
+    }
+}
+
+function populateWallList() {
+    const allWalls = getSavedWalls();
+    savedWallsList.innerHTML = ''; // Limpia la lista actual
+    
+    for (const wallName in allWalls) {
+        const li = document.createElement('li');
+        li.className = 'saved-wall-item';
+        li.dataset.name = wallName;
+        
+        const span = document.createElement('span');
+        span.textContent = wallName;
+        
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'delete-wall-btn';
+        deleteBtn.innerHTML = '&times;';
+        deleteBtn.title = 'Borrar este wall';
+
+        li.appendChild(span);
+        li.appendChild(deleteBtn);
+        savedWallsList.appendChild(li);
+    }
 }
 
 async function loadStream(url, cell) {
   const container = cell.querySelector('.stream-content');
   const controls = cell.querySelector('.controls-overlay');
 
-  // ---> CAMBIO: Añadimos el indicador de carga <---
   container.innerHTML = '<div class="loader"></div>';
-
   controls.style.display = 'none';
 
   if (!url) {
-    container.innerHTML = ''; // Limpiamos el loader si no hay URL
+    container.innerHTML = '';
     return;
   }
 
@@ -300,12 +432,8 @@ async function loadStream(url, cell) {
         layout: "video"
       });
       embed.addEventListener(Twitch.Embed.READY, () => {
-        // ---> ¡AQUÍ ESTÁ LA CORRECCIÓN! <---
-        // Elimina explícitamente el loader para Twitch
         const loader = container.querySelector('.loader');
         if (loader) loader.remove();
-        // --------------------------------------------------------------------
-
         const player = embed.getPlayer();
         cell.playerInstance = {
           setVolume: (vol) => player.setVolume(vol),
@@ -326,7 +454,7 @@ async function loadStream(url, cell) {
     video.playsinline = true;
     video.style.width = '100%';
     video.style.height = '100%';
-    container.innerHTML = ''; // Limpiamos el loader antes de añadir el video
+    container.innerHTML = '';
     container.appendChild(video);
     if (Hls.isSupported()) {
       const hls = new Hls();
@@ -350,7 +478,7 @@ async function loadStream(url, cell) {
     iframe.style.width = '100%';
     iframe.style.height = '100%';
     iframe.frameBorder = '0';
-    container.innerHTML = ''; // Limpiamos el loader
+    container.innerHTML = '';
     container.appendChild(iframe);
   }
 }
@@ -359,7 +487,6 @@ function onPlayerReady(event, cell, itemData, controls) {
     const player = cell.playerInstance;
     if (!player) return;
 
-    // A veces onPlayerReady puede tardar, así que aplicamos el estado de nuevo
     if (player.setVolume) player.setVolume(itemData.volume);
     if (player.setMuted) player.setMuted(itemData.muted);
 
