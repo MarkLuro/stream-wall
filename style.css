@@ -102,14 +102,13 @@ body {
   padding-left: 10px;
 }
 
-/* --- CAMBIO: Estilos para Layouts Asimétricos corregidos --- */
+/* --- Estilos para Layouts Asimétricos --- */
 #grid-container.layout--1-plus-3 {
   grid-template-columns: 3fr 1fr;
   grid-template-areas:
     "main side1"
     "main side2"
     "main side3";
-  /* Esta línea hace que las filas se estiren para llenar el espacio vertical */
   align-content: stretch;
 }
 
@@ -118,9 +117,22 @@ body {
 #grid-container.layout--1-plus-3 .stream-cell:nth-child(3) { grid-area: side2; }
 #grid-container.layout--1-plus-3 .stream-cell:nth-child(4) { grid-area: side3; }
 
+/* La celda principal SÍ se estira y su contenido también */
 #grid-container.layout--1-plus-3 .stream-cell:nth-child(1) .cell-content-wrapper {
   aspect-ratio: auto;
   height: 100%;
+}
+
+/* Centramos el contenido de video en las celdas laterales */
+#grid-container.layout--1-plus-3 .stream-cell:not(:nth-child(1)) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Liberamos los overlays para que se posicionen respecto a la celda */
+#grid-container.layout--1-plus-3 .stream-cell:not(:nth-child(1)) .cell-content-wrapper {
+  position: static;
 }
 /* --- FIN DE CAMBIOS DE LAYOUT --- */
 
@@ -138,6 +150,7 @@ body {
   aspect-ratio: 16 / 9;
   overflow: hidden;
   border-radius: calc(var(--border-radius) - 2px);
+  width: 100%;
 }
 
 .stream-content {
