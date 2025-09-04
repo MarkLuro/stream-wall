@@ -182,6 +182,42 @@ function generateGrid(layout = 'grid-4', savedItems = []) {
     dragHandle.innerHTML = '&#x2630;';
     dragHandle.title = 'Arrastrar para reordenar';
     cell.appendChild(dragHandle);
+    
+    const focusBtn = document.createElement('button');
+    focusBtn.className = 'focus-btn';
+    focusBtn.innerHTML = '&#x2197;'; // Flecha hacia arriba-derecha
+    focusBtn.title = 'Enfocar / Restaurar';
+    cell.appendChild(focusBtn);
+
+    focusBtn.onclick = () => {
+      const isCurrentlyFocused = cell.classList.contains('is-focused');
+
+      // Limpiamos cualquier estado de focus existente
+      gridContainer.classList.remove('in-focus-mode');
+      document.querySelectorAll('.stream-cell').forEach(c => {
+        c.classList.remove('is-focused', 'is-secondary');
+        // ---> MEJORA: Restaurar volumen/mute al salir de focus <---
+        if (c.playerInstance && c.playerInstance.originalMuteState !== undefined) {
+          c.playerInstance.setMuted(c.playerInstance.originalMuteState);
+          delete c.playerInstance.originalMuteState;
+        }
+      });
+
+      if (!isCurrentlyFocused) {
+        gridContainer.classList.add('in-focus-mode');
+        cell.classList.add('is-focused');
+        
+        document.querySelectorAll('.stream-cell:not(.is-focused)').forEach(c => {
+          c.classList.add('is-secondary');
+          // ---> MEJORA: Silenciar streams secundarios <---
+          if (c.playerInstance && c.playerInstance.isMuted) {
+            // Guardamos el estado de mute original para poder restaurarlo
+            c.playerInstance.originalMuteState = c.playerInstance.isMuted();
+            c.playerInstance.setMuted(true);
+          }
+        });
+      }
+    };
 
     const contentWrapper = document.createElement('div');
     contentWrapper.className = 'cell-content-wrapper';
@@ -442,7 +478,6 @@ async function loadStream(url, cell) {
         layout: "video"
       });
       embed.addEventListener(Twitch.Embed.READY, () => {
-        // ---> CORRECCIÓN: Eliminar explícitamente el loader para Twitch <---
         const loader = container.querySelector('.loader');
         if (loader) loader.remove();
         
