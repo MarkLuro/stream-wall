@@ -117,20 +117,17 @@ body {
 #grid-container.layout--1-plus-3 .stream-cell:nth-child(3) { grid-area: side2; }
 #grid-container.layout--1-plus-3 .stream-cell:nth-child(4) { grid-area: side3; }
 
-/* La celda principal SÍ se estira y su contenido también */
 #grid-container.layout--1-plus-3 .stream-cell:nth-child(1) .cell-content-wrapper {
   aspect-ratio: auto;
   height: 100%;
 }
 
-/* Centramos el contenido de video en las celdas laterales */
 #grid-container.layout--1-plus-3 .stream-cell:not(:nth-child(1)) {
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-/* Liberamos los overlays para que se posicionen respecto a la celda */
 #grid-container.layout--1-plus-3 .stream-cell:not(:nth-child(1)) .cell-content-wrapper {
   position: static;
 }
@@ -460,22 +457,7 @@ body.is-dragging .stream-cell video {
   100% { transform: rotate(360deg); }
 }
 
-/* INDICADOR DE CARGA */
-.loader {
-  border: 4px solid #f3f3f3;
-  border-top: 4px solid var(--accent);
-  border-radius: 50%;
-  width: 40px;
-  height: 40px;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-/* ---> MEJORA: Estilos para el estado de error <--- */
+/* MEJORA: Estilos para el estado de error */
 .error-container {
   padding: 1rem;
   text-align: center;
@@ -509,4 +491,66 @@ body.is-dragging .stream-cell video {
 
 .stream-cell.has-error {
   border-color: #e53935;
+}
+
+/* ---> VERSIÓN 4.0 FINAL: Estilos para el Modo Focus <--- */
+
+/* 1. Botón de Focus */
+.focus-btn {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  z-index: 10;
+  background-color: rgba(0, 0, 0, 0.6);
+  border: none;
+  color: #fff;
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  font-size: 1.2rem;
+  line-height: 1;
+}
+.stream-cell:hover .focus-btn {
+  opacity: 1;
+}
+
+/* 2. Layout AUTORITARIO de Focus usando Grid */
+#grid-container.in-focus-mode {
+  grid-template-columns: 1fr !important;
+  grid-template-rows: 1fr !important;
+  grid-template-areas: none !important;
+}
+
+/* 3. Colocamos la celda enfocada en nuestro nuevo grid 1x1 */
+#grid-container.in-focus-mode .stream-cell.is-focused {
+  grid-column: 1 / -1;
+  grid-row: 1 / -1;
+  z-index: 20;
+}
+
+/* 4. Ocultamos las celdas secundarias */
+#grid-container.in-focus-mode .stream-cell.is-secondary {
+  display: none;
+}
+
+/* 5. Ajustamos el contenedor del vídeo enfocado */
+#grid-container.in-focus-mode .stream-cell.is-focused .cell-content-wrapper {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
+  overflow: hidden; /* Muy importante para recortar el exceso del zoom */
+}
+
+/* 6. Forzar al vídeo/iframe a llenar el contenedor (ARREGLO BANDAS NEGRAS) */
+#grid-container.in-focus-mode .stream-cell.is-focused iframe,
+#grid-container.in-focus-mode .stream-cell.is-focused video {
+  object-fit: cover;
+  /* Aumentamos el zoom para garantizar que cubra cualquier banda negra */
+  transform: scale(1.1);
 }
