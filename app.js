@@ -9,6 +9,31 @@ const wallNameInput = document.getElementById('wall-name-input');
 const saveWallBtn = document.getElementById('save-wall-btn');
 const savedWallsList = document.getElementById('saved-walls-list');
 
+// --- INICIO: LÓGICA DE PESTAÑAS DEL SIDEBAR ---
+function setupSidebarTabs() {
+  const sidebar = document.getElementById('sidebar');
+  const tabs = sidebar.querySelectorAll('.sidebar-tab');
+  const panels = sidebar.querySelectorAll('.sidebar-panel');
+
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      // Ocultar todo
+      tabs.forEach(t => t.classList.remove('active'));
+      panels.forEach(p => p.classList.remove('active'));
+
+      // Mostrar el correcto
+      tab.classList.add('active');
+      const targetPanelId = `tab-${tab.dataset.tab}`;
+      const targetPanel = document.getElementById(targetPanelId);
+      if (targetPanel) {
+        targetPanel.classList.add('active');
+      }
+    });
+  });
+}
+setupSidebarTabs();
+// --- FIN: LÓGICA DE PESTAÑAS DEL SIDEBAR ---
+
 let sortableInstance = null;
 
 const LAYOUTS = {
@@ -71,18 +96,25 @@ muteAllBtn.addEventListener('click', () => {
   saveCurrentState();
 });
 
+// MEJORA 2: Lógica de carga actualizada para incluir la sesión anónima
 window.addEventListener('load', () => {
   populateWallList();
   const lastActiveWallName = localStorage.getItem('stream-wall-last-active');
   const allWalls = getSavedWalls();
+  const lastSessionRaw = localStorage.getItem('stream-wall-last-session');
 
   if (lastActiveWallName && allWalls[lastActiveWallName]) {
     const wallData = allWalls[lastActiveWallName];
     generateGrid(wallData.layout, wallData.items);
-  } else if (Object.keys(allWalls).length > 0) {
-    const firstWallName = Object.keys(allWalls)[0];
-    const wallData = allWalls[firstWallName];
-    generateGrid(wallData.layout, wallData.items);
+    setActiveWallIndicator(lastActiveWallName); // MEJORA 3
+  } else if (lastSessionRaw) {
+    try {
+        const wallData = JSON.parse(lastSessionRaw);
+        generateGrid(wallData.layout, wallData.items);
+    } catch(e) {
+        console.error("Error al cargar la última sesión", e);
+        generateGrid('grid-4');
+    }
   } else {
     generateGrid('grid-4');
   }
@@ -99,6 +131,7 @@ presetButtons.forEach(btn => {
 resetButton.onclick = () => {
   localStorage.removeItem('stream-wall-presets');
   localStorage.removeItem('stream-wall-last-active');
+  localStorage.removeItem('stream-wall-last-session'); // MEJORA 2
   location.reload();
 };
 
@@ -121,6 +154,7 @@ saveWallBtn.addEventListener('click', () => {
 
   wallNameInput.value = '';
   populateWallList();
+  setActiveWallIndicator(wallName); // MEJORA 3
 });
 
 savedWallsList.addEventListener('click', (e) => {
@@ -138,6 +172,7 @@ savedWallsList.addEventListener('click', (e) => {
 
             if (localStorage.getItem('stream-wall-last-active') === wallName) {
                 localStorage.removeItem('stream-wall-last-active');
+                setActiveWallIndicator(null); // MEJORA 3
             }
             populateWallList();
         }
@@ -146,6 +181,7 @@ savedWallsList.addEventListener('click', (e) => {
             const wallData = allWalls[wallName];
             generateGrid(wallData.layout, wallData.items);
             localStorage.setItem('stream-wall-last-active', wallName);
+            setActiveWallIndicator(wallName); // MEJORA 3
         }
     }
 });
@@ -182,38 +218,59 @@ function generateGrid(layout = 'grid-4', savedItems = []) {
     dragHandle.innerHTML = '&#x2630;';
     dragHandle.title = 'Arrastrar para reordenar';
     cell.appendChild(dragHandle);
-    
+
     const focusBtn = document.createElement('button');
     focusBtn.className = 'focus-btn';
     focusBtn.innerHTML = '&#x2197;'; // Flecha hacia arriba-derecha
     focusBtn.title = 'Enfocar / Restaurar';
     cell.appendChild(focusBtn);
 
+    // MEJORA 1: Lógica de Focus Mode completa
     focusBtn.onclick = () => {
       const isCurrentlyFocused = cell.classList.contains('is-focused');
+      const allCells = document.querySelectorAll('.stream-cell');
 
-      // Limpiamos cualquier estado de focus existente
-      gridContainer.classList.remove('in-focus-mode');
-      document.querySelectorAll('.stream-cell').forEach(c => {
-        c.classList.remove('is-focused', 'is-secondary');
-        // ---> MEJORA: Restaurar volumen/mute al salir de focus <---
-        if (c.playerInstance && c.playerInstance.originalMuteState !== undefined) {
-          c.playerInstance.setMuted(c.playerInstance.originalMuteState);
-          delete c.playerInstance.originalMuteState;
-        }
-      });
+      if (isCurrentlyFocused) { // --- SALIR DEL MODO FOCUS ---
+        gridContainer.classList.remove('in-focus-mode');
+        allCells.forEach(c => {
+          c.classList.remove('is-focused', 'is-secondary');
+          // Restaurar el estado de mute guardado
+          if (c.playerInstance && typeof c.playerInstance.originalState !== 'undefined') {
+            c.playerInstance.setMuted(c.playerInstance.originalState.muted);
+            const muteBtn = c.querySelector('.mute-btn');
+            muteBtn.innerHTML = c.playerInstance.originalState.muted ? '🔇' : '🔊';
+            delete c.playerInstance.originalState;
+          }
+        });
+      } else { // --- ENTRAR EN MODO FOCUS ---
+        // Limpiar cualquier estado anterior por si acaso
+        allCells.forEach(c => {
+          c.classList.remove('is-focused', 'is-secondary');
+          if (c.playerInstance && typeof c.playerInstance.originalState !== 'undefined') {
+            delete c.playerInstance.originalState;
+          }
+        });
 
-      if (!isCurrentlyFocused) {
         gridContainer.classList.add('in-focus-mode');
         cell.classList.add('is-focused');
-        
-        document.querySelectorAll('.stream-cell:not(.is-focused)').forEach(c => {
-          c.classList.add('is-secondary');
-          // ---> MEJORA: Silenciar streams secundarios <---
+
+        allCells.forEach(c => {
+          // Guardar estado original de todos los streams
           if (c.playerInstance && c.playerInstance.isMuted) {
-            // Guardamos el estado de mute original para poder restaurarlo
-            c.playerInstance.originalMuteState = c.playerInstance.isMuted();
-            c.playerInstance.setMuted(true);
+            c.playerInstance.originalState = { muted: c.playerInstance.isMuted() };
+          }
+          
+          if (c !== cell) {
+            c.classList.add('is-secondary');
+            // Silenciar streams secundarios
+            if (c.playerInstance) c.playerInstance.setMuted(true);
+          } else {
+            // Desactivar silencio en el stream principal
+            if (c.playerInstance) {
+                c.playerInstance.setMuted(false);
+                const muteBtn = c.querySelector('.mute-btn');
+                muteBtn.innerHTML = '🔊';
+            }
           }
         });
       }
@@ -365,15 +422,21 @@ function getCurrentLayout() {
     return 'grid-4';
 }
 
+// MEJORA 2: Lógica de guardado actualizada
 function saveCurrentState() {
   const layout = getCurrentLayout();
   const items = getCurrentItemsState();
-  const lastActiveWallName = localStorage.getItem('stream-wall-last-active');
+  const state = { layout, items };
 
+  // Guardar siempre la sesión actual (sesión anónima)
+  localStorage.setItem('stream-wall-last-session', JSON.stringify(state));
+
+  // Actualizar el wall nombrado si hay uno activo
+  const lastActiveWallName = localStorage.getItem('stream-wall-last-active');
   if (lastActiveWallName) {
       const allWalls = getSavedWalls();
       if (allWalls[lastActiveWallName]) {
-          allWalls[lastActiveWallName] = { layout, items };
+          allWalls[lastActiveWallName] = state;
           localStorage.setItem('stream-wall-presets', JSON.stringify(allWalls));
       }
   }
@@ -392,6 +455,7 @@ function getSavedWalls() {
 function populateWallList() {
     const allWalls = getSavedWalls();
     savedWallsList.innerHTML = '';
+    const lastActive = localStorage.getItem('stream-wall-last-active'); // MEJORA 3
 
     for (const wallName in allWalls) {
         const li = document.createElement('li');
@@ -410,6 +474,17 @@ function populateWallList() {
         li.appendChild(deleteBtn);
         savedWallsList.appendChild(li);
     }
+    setActiveWallIndicator(lastActive); // MEJORA 3
+}
+
+// MEJORA 3: Nueva función para el indicador visual
+function setActiveWallIndicator(wallName) {
+    document.querySelectorAll('.saved-wall-item').forEach(item => {
+        item.classList.remove('active');
+        if (item.dataset.name === wallName) {
+            item.classList.add('active');
+        }
+    });
 }
 
 async function loadStream(url, cell) {
@@ -426,7 +501,7 @@ async function loadStream(url, cell) {
     cell.classList.remove('is-loading');
     return;
   }
-  
+
   try {
     if (cell.playerInstance && typeof cell.playerInstance.destroy === 'function') {
         cell.playerInstance.destroy();
@@ -480,7 +555,7 @@ async function loadStream(url, cell) {
       embed.addEventListener(Twitch.Embed.READY, () => {
         const loader = container.querySelector('.loader');
         if (loader) loader.remove();
-        
+
         const player = embed.getPlayer();
         cell.playerInstance = {
           setVolume: (vol) => player.setVolume(vol),
@@ -546,7 +621,7 @@ async function loadStream(url, cell) {
 function onPlayerReady(event, cell, itemData, controls) {
     cell.classList.remove('is-loading');
     cell.classList.add('is-playing');
-    
+
     const player = cell.playerInstance;
     if (!player) return;
 

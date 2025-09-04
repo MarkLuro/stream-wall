@@ -9,32 +9,42 @@
 </head>
 <body>
   <div id="app-container" class="sidebar-closed">
-    <aside id="sidebar" class="closed">
-      <h2>Layouts</h2>
-      <div class="preset-buttons">
-        <button data-layout="grid-1">1 Stream</button>
-        <button data-layout="grid-4">4 Streams</button>
-        <button data-layout="grid-9">9 Streams</button>
-        <button data-layout="grid-16">16 Streams</button>
-        <button data-layout="1-plus-3">1 Principal + 3</button>
+        <aside id="sidebar" class="closed">
+      <!-- NAVEGACIÓN DE PESTAÑAS -->
+      <div class="sidebar-nav">
+        <button class="sidebar-tab active" data-tab="layouts">Layouts</button>
+        <button class="sidebar-tab" data-tab="walls">Mis Walls</button>
       </div>
-      
-      <div class="user-walls">
-        <h2>Mis Walls</h2>
-        <div class="save-wall-form">
-          <input type="text" id="wall-name-input" placeholder="Nombre del Wall...">
-          <button id="save-wall-btn">Guardar</button>
-        </div>
-        <div id="saved-walls-list-container">
-          <ul id="saved-walls-list">
-          </ul>
+
+      <!-- PANELES DE CONTENIDO -->
+      <div id="tab-layouts" class="sidebar-panel active">
+        <div class="preset-buttons">
+          <button data-layout="grid-1">1 Stream</button>
+          <button data-layout="grid-4">4 Streams</button>
+          <button data-layout="grid-9">9 Streams</button>
+          <button data-layout="grid-16">16 Streams</button>
+          <button data-layout="1-plus-3">1 Principal + 3</button>
         </div>
       </div>
 
+      <div id="tab-walls" class="sidebar-panel">
+        <div class="user-walls">
+          <div class="save-wall-form">
+            <input type="text" id="wall-name-input" placeholder="Nombre del Wall...">
+            <button id="save-wall-btn">Guardar</button>
+          </div>
+          <div id="saved-walls-list-container">
+            <ul id="saved-walls-list">
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- CONTROLES GLOBALES FIJOS -->
       <div class="global-controls">
         <button id="mute-all">Silenciar Todos</button>
+        <button id="reset">Resetear</button>
       </div>
-      <button id="reset">Resetear</button>
     </aside>
 
     <main id="grid-container"></main>
