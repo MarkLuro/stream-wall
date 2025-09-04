@@ -5,14 +5,12 @@ const resetButton = document.getElementById('reset');
 const toggleSidebar = document.getElementById('toggle-sidebar');
 const sidebar = document.getElementById('sidebar');
 const muteAllBtn = document.getElementById('mute-all');
-// ---> NUEVO: Referencias a los nuevos elementos de la UI <---
 const wallNameInput = document.getElementById('wall-name-input');
 const saveWallBtn = document.getElementById('save-wall-btn');
 const savedWallsList = document.getElementById('saved-walls-list');
 
 let sortableInstance = null;
 
-// ---> NUEVO: Objeto de configuración de Layouts <---
 const LAYOUTS = {
   'grid-1': { count: 1, name: '1 Stream' },
   'grid-4': { count: 4, name: '4 Streams' },
@@ -74,7 +72,6 @@ muteAllBtn.addEventListener('click', () => {
 });
 
 window.addEventListener('load', () => {
-  // ---> CAMBIO: Lógica de carga completamente nueva <---
   populateWallList();
   const lastActiveWallName = localStorage.getItem('stream-wall-last-active');
   const allWalls = getSavedWalls();
@@ -83,19 +80,16 @@ window.addEventListener('load', () => {
     const wallData = allWalls[lastActiveWallName];
     generateGrid(wallData.layout, wallData.items);
   } else if (Object.keys(allWalls).length > 0) {
-    // Si no hay último activo, carga el primero que encuentre
     const firstWallName = Object.keys(allWalls)[0];
     const wallData = allWalls[firstWallName];
     generateGrid(wallData.layout, wallData.items);
   } else {
-    // Si no hay nada guardado, carga un layout por defecto
     generateGrid('grid-4');
   }
 });
 
 presetButtons.forEach(btn => {
   btn.addEventListener('click', () => {
-    // ---> CAMBIO: Usa data-layout en lugar de data-count <---
     const layout = btn.dataset.layout;
     const currentItems = getCurrentItemsState();
     generateGrid(layout, currentItems);
@@ -103,13 +97,11 @@ presetButtons.forEach(btn => {
 });
 
 resetButton.onclick = () => {
-  // ---> CAMBIO: Limpia los nuevos items de localStorage <---
   localStorage.removeItem('stream-wall-presets');
   localStorage.removeItem('stream-wall-last-active');
   location.reload();
 };
 
-// ---> NUEVO: Event listeners para guardar, cargar y borrar walls <---
 saveWallBtn.addEventListener('click', () => {
   const wallName = wallNameInput.value.trim();
   if (!wallName) {
@@ -122,16 +114,15 @@ saveWallBtn.addEventListener('click', () => {
     layout: getCurrentLayout(),
     items: getCurrentItemsState()
   };
-  
+
   allWalls[wallName] = currentState;
   localStorage.setItem('stream-wall-presets', JSON.stringify(allWalls));
-  localStorage.setItem('stream-wall-last-active', wallName); // El que guardas es ahora el activo
+  localStorage.setItem('stream-wall-last-active', wallName);
 
   wallNameInput.value = '';
-  populateWallList(); // Actualiza la lista en la UI
+  populateWallList();
 });
 
-// Usamos delegación de eventos para los botones de la lista
 savedWallsList.addEventListener('click', (e) => {
     const target = e.target;
     const wallItem = target.closest('.saved-wall-item');
@@ -141,18 +132,16 @@ savedWallsList.addEventListener('click', (e) => {
     const allWalls = getSavedWalls();
 
     if (target.classList.contains('delete-wall-btn')) {
-        // --- BORRAR WALL ---
         if (confirm(`¿Seguro que quieres borrar el wall "${wallName}"?`)) {
             delete allWalls[wallName];
             localStorage.setItem('stream-wall-presets', JSON.stringify(allWalls));
-            
+
             if (localStorage.getItem('stream-wall-last-active') === wallName) {
                 localStorage.removeItem('stream-wall-last-active');
             }
             populateWallList();
         }
     } else {
-        // --- CARGAR WALL ---
         if (allWalls[wallName]) {
             const wallData = allWalls[wallName];
             generateGrid(wallData.layout, wallData.items);
@@ -171,17 +160,16 @@ function generateGrid(layout = 'grid-4', savedItems = []) {
   }
   const count = layoutConfig.count;
 
-  // ---> CAMBIO: Control de layout por clases CSS en lugar de JS inline style <---
-  gridContainer.className = ''; // Limpia clases de layout anteriores
+  gridContainer.className = '';
   gridContainer.classList.add(`layout--${layout}`);
-  
+
   if (layout.startsWith('grid-')) {
     const cols = Math.ceil(Math.sqrt(count));
     gridContainer.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
   } else {
-    gridContainer.style.gridTemplateColumns = ''; // Dejamos que el CSS lo maneje
+    gridContainer.style.gridTemplateColumns = '';
   }
-  
+
   for (let i = 0; i < count; i++) {
     const itemData = savedItems[i] || { url: '', volume: 0.5, muted: true };
 
@@ -214,7 +202,7 @@ function generateGrid(layout = 'grid-4', savedItems = []) {
 
     const loadAndSave = () => {
       if (!input.value.trim()) {
-        streamContainer.innerHTML = '<p class="error-msg">Introduce una URL válida</p>';
+        showError(cell, 'Introduce una URL válida.');
         return;
       }
       loadStream(input.value.trim(), cell);
@@ -303,6 +291,22 @@ function generateGrid(layout = 'grid-4', savedItems = []) {
   });
 }
 
+function showError(cell, message) {
+    const container = cell.querySelector('.stream-content');
+    container.innerHTML = `
+        <div class="error-container">
+            <p>${message}</p>
+            <button class="retry-btn">Reintentar</button>
+        </div>
+    `;
+    const input = cell.querySelector('.input-overlay input');
+    container.querySelector('.retry-btn').onclick = () => loadStream(input.value, cell);
+
+    cell.classList.remove('is-loading', 'is-playing');
+    cell.classList.add('has-error');
+}
+
+
 function getCurrentItemsState() {
   return Array.from(document.querySelectorAll('.stream-cell')).map(cell => {
     const input = cell.querySelector('.input-overlay input');
@@ -316,22 +320,20 @@ function getCurrentItemsState() {
   });
 }
 
-// ---> NUEVO: Helper para obtener el layout actual <---
 function getCurrentLayout() {
     for (const className of gridContainer.classList) {
         if (className.startsWith('layout--')) {
             return className.replace('layout--', '');
         }
     }
-    return 'grid-4'; // Fallback
+    return 'grid-4';
 }
 
-// ---> CAMBIO: La función de guardado ahora actualiza el "wall activo" <---
 function saveCurrentState() {
   const layout = getCurrentLayout();
   const items = getCurrentItemsState();
   const lastActiveWallName = localStorage.getItem('stream-wall-last-active');
-  
+
   if (lastActiveWallName) {
       const allWalls = getSavedWalls();
       if (allWalls[lastActiveWallName]) {
@@ -341,7 +343,6 @@ function saveCurrentState() {
   }
 }
 
-// ---> NUEVO: Funciones para manejar los presets guardados <---
 function getSavedWalls() {
     try {
         const walls = localStorage.getItem('stream-wall-presets');
@@ -354,16 +355,16 @@ function getSavedWalls() {
 
 function populateWallList() {
     const allWalls = getSavedWalls();
-    savedWallsList.innerHTML = ''; // Limpia la lista actual
-    
+    savedWallsList.innerHTML = '';
+
     for (const wallName in allWalls) {
         const li = document.createElement('li');
         li.className = 'saved-wall-item';
         li.dataset.name = wallName;
-        
+
         const span = document.createElement('span');
         span.textContent = wallName;
-        
+
         const deleteBtn = document.createElement('button');
         deleteBtn.className = 'delete-wall-btn';
         deleteBtn.innerHTML = '&times;';
@@ -379,18 +380,26 @@ async function loadStream(url, cell) {
   const container = cell.querySelector('.stream-content');
   const controls = cell.querySelector('.controls-overlay');
 
+  cell.classList.add('is-loading');
+  cell.classList.remove('has-error', 'is-playing');
   container.innerHTML = '<div class="loader"></div>';
   controls.style.display = 'none';
 
   if (!url) {
     container.innerHTML = '';
+    cell.classList.remove('is-loading');
     return;
   }
-
-  if (cell.playerInstance && typeof cell.playerInstance.destroy === 'function') {
-      cell.playerInstance.destroy();
+  
+  try {
+    if (cell.playerInstance && typeof cell.playerInstance.destroy === 'function') {
+        cell.playerInstance.destroy();
+    }
+  } catch (e) {
+    console.error("Error destruyendo instancia previa:", e);
+  } finally {
+    cell.playerInstance = null;
   }
-  cell.playerInstance = null;
 
   const playerContainerId = container.id;
   const itemData = getCurrentItemsState()[Array.from(gridContainer.children).indexOf(cell)];
@@ -405,7 +414,8 @@ async function loadStream(url, cell) {
         videoId: id,
         playerVars: { 'autoplay': 1, 'mute': 1, 'playsinline': 1, 'controls': 1 },
         events: {
-          'onReady': (event) => onPlayerReady(event, cell, itemData, controls)
+          'onReady': (event) => onPlayerReady(event, cell, itemData, controls),
+          'onError': (event) => showError(cell, `Error de YouTube: ${event.data}`)
         }
       });
       cell.playerInstance = {
@@ -416,7 +426,7 @@ async function loadStream(url, cell) {
         destroy: () => player.destroy()
       };
     } else {
-      container.innerHTML = '<p class="error-msg">URL de YouTube inválida</p>';
+      showError(cell, 'URL de YouTube inválida.');
     }
   } else if (url.includes('twitch.tv')) {
     const channel = extractTwitchChannel(url);
@@ -432,8 +442,10 @@ async function loadStream(url, cell) {
         layout: "video"
       });
       embed.addEventListener(Twitch.Embed.READY, () => {
+        // ---> CORRECCIÓN: Eliminar explícitamente el loader para Twitch <---
         const loader = container.querySelector('.loader');
         if (loader) loader.remove();
+        
         const player = embed.getPlayer();
         cell.playerInstance = {
           setVolume: (vol) => player.setVolume(vol),
@@ -445,7 +457,7 @@ async function loadStream(url, cell) {
         onPlayerReady({target: player}, cell, itemData, controls);
       });
     } else {
-      container.innerHTML = '<p class="error-msg">URL de Twitch inválida</p>';
+      showError(cell, 'URL de Twitch inválida.');
     }
   } else if (url.endsWith('.m3u8')) {
     const video = document.createElement('video');
@@ -458,6 +470,11 @@ async function loadStream(url, cell) {
     container.appendChild(video);
     if (Hls.isSupported()) {
       const hls = new Hls();
+      hls.on(Hls.Events.ERROR, function (event, data) {
+          if (data.fatal) {
+              showError(cell, `Error fatal de HLS: ${data.details}`);
+          }
+      });
       hls.loadSource(url);
       hls.attachMedia(video);
       cell.playerInstance = {
@@ -469,7 +486,7 @@ async function loadStream(url, cell) {
       };
       onPlayerReady({target: video}, cell, itemData, controls);
     } else {
-      container.innerHTML = '<p class="error-msg">Navegador no soporta HLS</p>';
+      showError(cell, 'Tu navegador no soporta HLS.');
     }
   } else {
     const iframe = document.createElement('iframe');
@@ -478,12 +495,23 @@ async function loadStream(url, cell) {
     iframe.style.width = '100%';
     iframe.style.height = '100%';
     iframe.frameBorder = '0';
+    iframe.onload = () => {
+        cell.classList.remove('is-loading');
+        cell.classList.add('is-playing');
+        controls.style.display = 'flex';
+    };
+    iframe.onerror = () => {
+        showError(cell, 'No se pudo cargar el iframe. La URL puede ser incorrecta o bloquear la inserción.');
+    };
     container.innerHTML = '';
     container.appendChild(iframe);
   }
 }
 
 function onPlayerReady(event, cell, itemData, controls) {
+    cell.classList.remove('is-loading');
+    cell.classList.add('is-playing');
+    
     const player = cell.playerInstance;
     if (!player) return;
 
@@ -492,7 +520,7 @@ function onPlayerReady(event, cell, itemData, controls) {
 
     const muteBtn = cell.querySelector('.mute-btn');
     const slider = cell.querySelector('.volume-slider');
-    
+
     if (player.isMuted) {
       const isMuted = player.isMuted();
       muteBtn.innerHTML = isMuted ? '🔇' : '🔊';
